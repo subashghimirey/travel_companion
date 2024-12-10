@@ -1,24 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
 import * as Location from 'expo-location';
 import axios from 'axios';
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation hook
 
-// Define the type for the places data
-interface Place {
-  fsq_id: string;
-  name: string;
-  location: {
-    address: string;
-  };
-}
+// Define the structure for the placesByCountry
+type PlacesByCountry = {
+  [key: string]: string[];  // This means the keys are country names, and values are arrays of strings (places)
+};
+
+// Predefined places by country
+const placesByCountry: PlacesByCountry = {
+  Nepal: ["Pokhara", "Chitwan", "Lumbini", "Kathmandu", "Mount Everest", "Patan", "Bhaktapur", "Nagarkot", "Rara Lake", "Bandipur"],
+  USA: ["New York", "Los Angeles", "San Francisco", "Miami", "Las Vegas", "Chicago", "Hawaii", "Grand Canyon", "Yellowstone", "Washington DC"],
+  India: ["Agra", "Jaipur", "Delhi", "Mumbai", "Goa", "Kerala", "Darjeeling", "Shimla", "Leh", "Varanasi"],
+  Canada: ["Toronto", "Vancouver", "Montreal", "Ottawa", "Niagara Falls", "Banff", "Whistler", "Quebec City", "Calgary", "Victoria"],
+  Germany: ["Berlin", "Munich", "Frankfurt", "Hamburg", "Cologne", "Dresden", "Bavarian Alps", "Lake Constance", "Rothenburg", "Hamburg"],
+  Australia: ["Sydney", "Melbourne", "Brisbane", "Great Barrier Reef", "Perth", "Gold Coast", "Tasmania", "Adelaide", "Cairns", "Uluru"],
+  UK: ["London", "Edinburgh", "Liverpool", "Manchester", "Bristol", "Oxford", "Cambridge", "York", "Bath", "Cardiff"],
+  France: ["Paris", "Nice", "Lyon", "Marseille", "Bordeaux", "Toulouse", "Mont Saint-Michel", "Versailles", "Nantes", "Strasbourg"],
+  Japan: ["Tokyo", "Kyoto", "Osaka", "Hokkaido", "Fukuoka", "Nara", "Hiroshima", "Okinawa", "Sapporo", "Nagoya"],
+  Italy: ["Rome", "Venice", "Florence", "Milan", "Naples", "Amalfi Coast", "Tuscany", "Sicily", "Cinque Terre", "Verona"]
+};
+
+// Country mapping to handle full names to short names
+const countryMapping: Record<string, string> = {
+  "United States": "USA",
+  "United Kingdom": "UK",
+  "Nepal": "Nepal",
+  "Canada": "Canada",
+  "Germany": "Germany",
+  "Australia": "Australia",
+  "France": "France",
+  "Japan": "Japan",
+  "Italy": "Italy",
+  // Add any other necessary mappings here
+};
 
 const FindPlacesScreen = () => {
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [places, setPlaces] = useState<Place[]>([]); // Use the defined type for the places array
+  const [country, setCountry] = useState<string | null>(null);
+  const [city, setCity] = useState<string | null>(null);
+  const [places, setPlaces] = useState<string[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
+  
+  // Use navigation hook for navigation
+  const navigation = useNavigation();
 
   useEffect(() => {
-    // Get the user's location when the component mounts
     getUserLocation();
   }, []);
 
@@ -32,44 +61,46 @@ const FindPlacesScreen = () => {
 
       const location = await Location.getCurrentPositionAsync();
       setLocation(location);
-      fetchNearbyPlaces(location.coords.latitude, location.coords.longitude); // Fetch places once we have the location
+
+      const { latitude, longitude } = location.coords;
+      fetchLocationDetails(latitude, longitude);
     } catch (error) {
-      setErrorMsg('Error getting your location. Please try again.');
+      setErrorMsg('Error getting location details');
     }
   };
 
-  const fetchNearbyPlaces = async (latitude: number, longitude: number) => {
+  const fetchLocationDetails = async (latitude: number, longitude: number) => {
     try {
-      const apiKey = 'fsq3939vcV7Qn1Q8iZhkzHzWHXX/226iJ81OlhpRXapOV40='; // Replace with your Foursquare API key
-      const radius = 5000; // 5km radius
-      const limit = 10; // Limit the number of places to fetch
+      // Use OpenCage or other reverse geocoding API to get city and country
+      const apiKey = '1480990bea1a43b5a347476ee0dd7657'; // Replace with your OpenCage API key
+      const url = `https://api.opencagedata.com/geocode/v1/json?q=${latitude}+${longitude}&key=${apiKey}`;
+      const response = await axios.get(url);
 
-      // Foursquare API URL
-      const url = `https://api.foursquare.com/v3/places/nearby?ll=${latitude},${longitude}&radius=${radius}&limit=${limit}`;
+      const result = response.data.results[0];
+      if (result) {
+        const city = result.components.city || result.components.town || result.components.village;
+        const country = result.components.country;
 
-      // Set headers with the Foursquare API key
-      const config = {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-      };
+        // Normalize the country using the mapping
+        const normalizedCountry = countryMapping[country] || country;
 
-      // Fetch places from Foursquare API
-      const response = await axios.get(url, config);
+        setCity(city || "Unknown City");
+        setCountry(normalizedCountry || "Unknown Country");
 
-      // Save the places in state
-      setPlaces(response.data.results);
+        console.log('Detected country:', normalizedCountry); // Log the normalized country for debugging
+
+        // Fetch places based on normalized country name
+        if (normalizedCountry && placesByCountry[normalizedCountry]) {
+          setPlaces(placesByCountry[normalizedCountry]);
+        } else {
+          console.log(`No places found for ${normalizedCountry}`);
+          setPlaces([]);
+        }
+      }
     } catch (error) {
-      setErrorMsg('Error fetching places. Please try again.');
+      setErrorMsg('Error fetching location details');
     }
   };
-
-  const renderPlace = ({ item }: { item: Place }) => (  // Define type for item
-    <TouchableOpacity style={styles.card}>
-      <Text style={styles.cardTitle}>{item.name}</Text>
-      <Text style={styles.cardDescription}>{item.location.address || 'Address not available'}</Text>
-    </TouchableOpacity>
-  );
 
   return (
     <View style={styles.container}>
@@ -77,15 +108,44 @@ const FindPlacesScreen = () => {
         <Text style={styles.errorText}>{errorMsg}</Text>
       ) : location ? (
         <>
-          <Text style={styles.heading}>Nearby Places to Visit</Text>
+          <View style={styles.locationContainer}>
+            {city && country ? (
+              <Text style={styles.locationText}>
+                Your Location: {city}, {country}
+              </Text>
+            ) : (
+              <Text style={styles.locationText}>Fetching your location...</Text>
+            )}
+          </View>
+          <Text style={styles.heading}>Places to Visit in {country}</Text>
+          
+          {/* Back Button */}
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}  // Navigates back to the previous screen
+          >
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+
           <FlatList
             data={places}
-            renderItem={renderPlace}
-            keyExtractor={(item) => item.fsq_id} // Unique identifier from Foursquare API
+            renderItem={({ item }) => (
+              <TouchableOpacity style={styles.placeCard}>
+                <Image
+                  source={{ uri: 'https://via.placeholder.com/100x100.png' }} // Placeholder image for now
+                  style={styles.placeImage}
+                />
+                <View style={styles.placeInfo}>
+                  <Text style={styles.placeTitle}>{item}</Text>
+                  <Text style={styles.placeDescription}>Explore {item} for an unforgettable experience.</Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            keyExtractor={(item, index) => index.toString()}
           />
         </>
       ) : (
-        <Text style={styles.loadingText}>Loading your location...</Text>
+        <Text>Loading your location...</Text>
       )}
     </View>
   );
@@ -97,35 +157,70 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#f2f2f2',
   },
-  heading: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  locationContainer: {
     marginBottom: 20,
-  },
-  card: {
     backgroundColor: '#6372ff',
-    padding: 15,
-    marginBottom: 10,
+    padding: 10,
     borderRadius: 10,
-    alignItems: 'center',
   },
-  cardTitle: {
+  locationText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  cardDescription: {
+  heading: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  backButton: {
+    marginBottom: 20,
+    backgroundColor: '#ff6347',
+    padding: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  backButtonText: {
     color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  placeCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginBottom: 15,
+    borderRadius: 10,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  placeImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 10,
+  },
+  placeInfo: {
+    marginLeft: 15,
+    justifyContent: 'center',
+  },
+  placeTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  placeDescription: {
     fontSize: 14,
+    color: '#666',
     marginTop: 5,
   },
   errorText: {
     color: 'red',
-    textAlign: 'center',
-  },
-  loadingText: {
-    textAlign: 'center',
     fontSize: 16,
+    textAlign: 'center',
   },
 });
 

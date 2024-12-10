@@ -21,15 +21,19 @@ const HomeScreen = () => {
     router.push('/add-image');
   };
 
-  const handleWriteNotes = () => {
-    // Implement File System API to write notes
-    router.push('/write-notes');
+  const handleClickImage = () => {
+    router.push('/photo');
   };
 
-  const handleViewItinerary = () => {
-    // Implement itinerary viewing
-    router.push('/view-itinerary');
+  const handleWriteNotes = () => {
+    // Implement File System API to write notes
+    router.push('/list-notes');
   };
+
+  // const handleViewItinerary = () => {
+  //   // Implement itinerary viewing
+  //   router.push('/view-itinerary');
+  // };
 
   return (
     <View style={styles.container}>
@@ -57,15 +61,20 @@ const HomeScreen = () => {
           <Text style={styles.cardTitle}>Add Photos from Your Travels</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.card} onPress={handleClickImage}>
+          <FontAwesome name="camera" size={30} color="white" />
+          <Text style={styles.cardTitle}>Click photos now</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.card} onPress={handleWriteNotes}>
           <FontAwesome name="file-text" size={30} color="white" />
           <Text style={styles.cardTitle}>Write Travel Notes</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.card} onPress={handleViewItinerary}>
+        {/* <TouchableOpacity style={styles.card} onPress={handleViewItinerary}>
           <FontAwesome name="book" size={30} color="white" />
           <Text style={styles.cardTitle}>View Itinerary</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
     </View>
   );
